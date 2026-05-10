@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astraeus Water Simulator - Optics Update</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Light Mode Defaults */
+  --bg: #f8f9fb;
+  --bg2: #ffffff;
+  --bg3: #f1f3f7;
+  --bg4: #e8ebf2;
+  --border: #e2e6ef;
+  --border2: #d0d6e8;
+  --text: #111827;
+  --text2: #6b7280;
+  --text3: #9ca3af;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  
+  --r: 10px;
+  --r2: 14px;
+  --r3: 20px;
+  --header: 64px;
+  --panel: 320px;
+  
+  --font-ui: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Syne', sans-serif;
+  
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.05);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.1), 0 4px 12px rgba(0,0,0,.06);
+}
+
+[data-theme="dark"] {
+  --bg: #0a0c14;
+  --bg2: #11131f;
+  --bg3: #1a1d2d;
+  --bg4: #25293d;
+  --border: #2a2e45;
+  --border2: #3a405c;
+  --text: #f9fafb;
+  --text2: #9ca3af;
+  --text3: #6b7280;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; transition: background 0.3s, color 0.3s; }
+
+/* ── ANIMATED BLUE GRADIENT ── */
+@keyframes gradShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.grad-text {
+  background: linear-gradient(120deg, #1d4ed8, #3b82f6, #0ea5e9, #6366f1, #2563eb, #38bdf8);
+  background-size: 300% 300%;
+  animation: gradShift 5s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.grad-bg {
+  background: linear-gradient(120deg, #1d4ed8, #3b82f6, #0ea5e9, #6366f1, #2563eb, #38bdf8);
+  background-size: 300% 300%;
+  animation: gradShift 5s ease infinite;
+}
+
+/* ── HEADER ── */
+#header {
+  height: var(--header); display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; background: var(--bg2); border-bottom: 1px solid var(--border);
+  position: relative; z-index: 200; box-shadow: var(--shadow-sm); transition: background 0.3s, border-color 0.3s;
+}
+.logo { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: -0.5px; }
+.logo-icon { width: 36px; height: 36px; border-radius: var(--r2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--shadow-sm); }
+.logo-icon svg { width: 18px; height: 18px; color: #fff; }
+.logo-sub { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--text3); letter-spacing: .1em; margin-top: 2px; }
+
+.header-tools { display: flex; align-items: center; gap: 12px; }
+.tool-group { display: flex; align-items: center; gap: 6px; background: var(--bg3); border: 1px solid var(--border); padding: 4px; border-radius: var(--r2); transition: background 0.3s, border-color 0.3s; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px;
+  border-radius: var(--r); border: 1px solid transparent; background: transparent;
+  color: var(--text2); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: all .2s; font-family: var(--font-ui);
+}
+.btn svg { width: 15px; height: 15px; }
+.btn:hover { background: var(--bg4); color: var(--text); }
+.btn.active { background: var(--bg2); color: var(--accent); border-color: var(--border2); box-shadow: var(--shadow-sm); }
+
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-hover); color: #fff; transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+
+.btn-full { width: 100%; margin-top: 8px; border: 1px solid var(--border2); background: var(--bg3); }
+
+/* ── LAYOUT ── */
+#app { display: flex; height: calc(100vh - var(--header)); overflow: hidden; position: relative; }
+
+/* ── VIEWPORT ── */
+#viewport { flex: 1; position: relative; background: #000; overflow: hidden; }
+#canvas-container { width: 100%; height: 100%; display: block; }
+.vp-overlay {
+  position: absolute; bottom: 24px; left: 24px; background: rgba(var(--bg2-rgb), 0.85);
+  backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: var(--r2);
+  padding: 16px 20px; box-shadow: var(--shadow-lg); pointer-events: none; transition: all 0.3s;
+}
+.vp-title { font-family: var(--font-display); font-size: 20px; font-weight: 800; letter-spacing: -.5px; margin-bottom: 4px; }
+.vp-desc { font-size: 12px; color: var(--text2); font-family: var(--font-mono); }
+
+.fps-badge {
+  position: absolute; top: 24px; left: 24px; background: var(--bg2);
+  border: 1px solid var(--border); border-radius: 20px; padding: 6px 12px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text);
+  box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 6px;
+  user-select: none; transition: background 0.3s, border-color 0.3s, color 0.3s;
+}
+.fps-dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981; }
+
+/* ── SETTINGS PANEL ── */
+#settings-panel {
+  width: var(--panel); min-width: var(--panel); background: var(--bg2);
+  border-left: 1px solid var(--border); display: flex; flex-direction: column;
+  overflow-y: auto; overflow-x: hidden; transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
+}
+#settings-panel.hidden { margin-right: calc(var(--panel) * -1); }
+
+.panel-header { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.panel-title { font-family: var(--font-display); font-size: 16px; font-weight: 800; letter-spacing: -.3px; }
+.panel-section { padding: 20px; border-bottom: 1px solid var(--border); }
+.panel-sec-title { font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.panel-sec-title svg { width: 14px; height: 14px; }
+
+/* ── CONTROLS ── */
+.ctrl-row { margin-bottom: 16px; }
+.ctrl-row:last-child { margin-bottom: 0; }
+.ctrl-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.ctrl-name { font-size: 13px; font-weight: 500; color: var(--text); }
+.ctrl-val { font-family: var(--font-mono); font-size: 11px; color: var(--accent); background: rgba(59,130,246,.1); padding: 4px 8px; border-radius: 6px; font-weight: 600; }
+
+.ctrl-slider {
+  width: 100%; height: 6px; border-radius: 99px; -webkit-appearance: none; appearance: none;
+  background: var(--bg4); outline: none; cursor: pointer; transition: background .15s;
+}
+.ctrl-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; border: 3px solid var(--bg2); box-shadow: 0 0 0 1px var(--border2), var(--shadow-sm); transition: all .15s;
+}
+.ctrl-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+
+/* Color Picker Row */
+.ctrl-color-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.color-picker {
+  -webkit-appearance: none; border: none; width: 32px; height: 32px; border-radius: var(--r);
+  cursor: pointer; padding: 0; background: none; overflow: hidden; box-shadow: inset 0 0 0 1px var(--border2);
+}
+.color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.color-picker::-webkit-color-swatch { border: none; border-radius: var(--r); }
+
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="logo">
+    <div class="logo-icon grad-bg">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+    </div>
+    <div>
+      <div><span class="grad-text">Astraeus</span><span class="grad-text" style="font-weight:800"> Optics</span></div>
+      <div class="logo-sub">HYDRO-SIMULATOR</div>
+    </div>
+  </div>
+
+  <div class="header-tools">
+    <div class="tool-group">
+      <button class="btn" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>
+      </button>
+
+    </div>
+    
+    <div class="tool-group">
+      <button class="btn" onclick="exportHTML()" title="Download Source">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" /></svg>
+        HTML
+      </button>
+      <button class="btn btn-primary" onclick="exportPNG()">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+        Export PNG
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="viewport">
+    <canvas id="canvas-container"></canvas>
+    
+    <div class="fps-badge">
+      <div class="fps-dot"></div>
+      <span id="fps-val">60 FPS</span>
+    </div>
+
+    <div class="vp-overlay" id="overlay" style="background: var(--bg2);">
+      <div class="vp-title"><span class="grad-text">Fluid Optics</span></div>
+      <div class="vp-desc">True refraction & transmission · Interactive surface</div>
+    </div>
+  </div>
+
+  <div id="settings-panel">
+    <div class="panel-header">
+      <div class="panel-title">Settings</div>
+      <button class="btn" style="padding:4px" onclick="toggleSettings()">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-sec-title">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" /></svg>
+        Presets
+      </div>
+      <button class="btn btn-full" onclick="setRealistic()">
+        <span class="grad-text" style="font-weight: 700;">Set Realistic Optics</span>
+      </button>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-sec-title">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" /></svg>
+        Physics Engine
+      </div>
+      
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Viscosity (Damping)</span>
+          <span class="ctrl-val" id="val-damp">0.96</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-damp" min="0.80" max="0.99" step="0.01" value="0.96">
+      </div>
+      
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Ripple Radius</span>
+          <span class="ctrl-val" id="val-radius">4</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-radius" min="1" max="15" step="1" value="4">
+      </div>
+      
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Interaction Force</span>
+          <span class="ctrl-val" id="val-force">1.5</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-force" min="0.5" max="5.0" step="0.1" value="1.5">
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-sec-title">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+        Optics & Refraction
+      </div>
+      
+      <div class="ctrl-color-row">
+        <span class="ctrl-name">Water Tint</span>
+        <input type="color" class="color-picker" id="color-water" value="#0ea5e9">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Transparency</span>
+          <span class="ctrl-val" id="val-trans">0.0</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-trans" min="0" max="1" step="0.05" value="0.0">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">IOR (Refraction)</span>
+          <span class="ctrl-val" id="val-ior">1.33</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-ior" min="1.0" max="2.0" step="0.01" value="1.33">
+      </div>
+      
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Metalness</span>
+          <span class="ctrl-val" id="val-metal">0.9</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-metal" min="0" max="1" step="0.05" value="0.9">
+      </div>
+      
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Roughness</span>
+          <span class="ctrl-val" id="val-rough">0.1</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-rough" min="0" max="1" step="0.05" value="0.1">
+      </div>
+    </div>
+
+    <!-- SUN & LIGHTING -->
+    <div class="panel-section">
+      <div class="panel-sec-title">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>
+        Sun &amp; Lighting
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Sun Azimuth</span>
+          <span class="ctrl-val" id="val-sun-az">45°</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-sun-az" min="0" max="360" step="1" value="45">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Sun Elevation</span>
+          <span class="ctrl-val" id="val-sun-el">55°</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-sun-el" min="5" max="90" step="1" value="55">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Sun Intensity</span>
+          <span class="ctrl-val" id="val-sun-int">3.5</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-sun-int" min="0" max="8" step="0.1" value="3.5">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Exposure</span>
+          <span class="ctrl-val" id="val-exposure">1.2</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-exposure" min="0.5" max="3.0" step="0.1" value="1.2">
+      </div>
+    </div>
+
+    <!-- REFLECTION & REFRACTION -->
+    <div class="panel-section">
+      <div class="panel-sec-title">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z" /></svg>
+        Reflection &amp; Refraction
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Reflection Strength</span>
+          <span class="ctrl-val" id="val-envmap">1.8</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-envmap" min="0" max="4" step="0.1" value="1.8">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Clearcoat (Fresnel)</span>
+          <span class="ctrl-val" id="val-clearcoat">1.00</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-clearcoat" min="0" max="1" step="0.01" value="1.0">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Refraction Depth</span>
+          <span class="ctrl-val" id="val-thickness">4.0</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-thickness" min="0.5" max="12" step="0.5" value="4.0">
+      </div>
+    </div>
+
+    <!-- WAVE DYNAMICS -->
+    <div class="panel-section">
+      <div class="panel-sec-title">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5c1.5 0 1.5-3 3-3s1.5 3 3 3 1.5-3 3-3 1.5 3 3 3 1.5-3 3-3" /></svg>
+        Wave Dynamics
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span class="ctrl-name">Wave Amplitude</span>
+          <span class="ctrl-val" id="val-amplitude">1.0</span>
+        </div>
+        <input type="range" class="ctrl-slider" id="slider-amplitude" min="0.1" max="4.0" step="0.1" value="1.0">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── UI LOGIC ──
+function toggleSettings() {
+  document.getElementById('settings-panel').classList.toggle('hidden');
+}
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const overlay = document.getElementById('overlay');
+  if (html.getAttribute('data-theme') === 'dark') {
+    html.removeAttribute('data-theme');
+    overlay.style.background = 'rgba(255, 255, 255, 0.85)';
+  } else {
+    html.setAttribute('data-theme', 'dark');
+    overlay.style.background = 'rgba(17, 19, 31, 0.85)';
+  }
+}
+
+function exportPNG() {
+  renderer.render(scene, camera);
+  const dataURL = canvas.toDataURL('image/png');
+  const link = document.createElement('a');
+  link.download = 'astraeus-optics.png';
+  link.href = dataURL;
+  link.click();
+}
+
+function exportHTML() {
+  const source = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+  const blob = new Blob([source], { type: 'text/html' });
+  const link = document.createElement('a');
+  link.download = 'astraeus-optics.html';
+  link.href = URL.createObjectURL(blob);
+  link.click();
+}
+
+// ── THREE.JS FLUID SIMULATION ──
+const canvas = document.getElementById('canvas-container');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+
+// Camera setup
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+camera.position.set(0, 45, 60);
+camera.lookAt(0, 0, 0);
+
+// ── AAA LIGHTING SYSTEM ──
+const ambientLight = new THREE.AmbientLight(0x8ab4cc, 0.4);
+scene.add(ambientLight);
+
+const skyLight = new THREE.DirectionalLight(0xc8ddee, 0.6);
+skyLight.position.set(0, 80, 0);
+scene.add(skyLight);
+
+let sunAzimuth = 45;
+let sunElevation = 55;
+
+const sunLight = new THREE.DirectionalLight(0xfff5e0, 3.5);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far = 300;
+sunLight.shadow.camera.left = -80;
+sunLight.shadow.camera.right = 80;
+sunLight.shadow.camera.top = 80;
+sunLight.shadow.camera.bottom = -80;
+sunLight.shadow.bias = -0.001;
+scene.add(sunLight);
+
+function updateSunPosition() {
+  const az = sunAzimuth * Math.PI / 180;
+  const el = sunElevation * Math.PI / 180;
+  const dist = 80;
+  sunLight.position.set(
+    Math.sin(az) * Math.cos(el) * dist,
+    Math.sin(el) * dist,
+    Math.cos(az) * Math.cos(el) * dist
+  );
+  const warmth = Math.max(0, 1 - sunElevation / 60);
+  sunLight.color.setRGB(1.0, 1.0 - warmth * 0.25, 1.0 - warmth * 0.55);
+}
+updateSunPosition();
+
+const causticLight = new THREE.PointLight(0x38bdf8, 2.0, 60);
+causticLight.position.set(0, -8, 0);
+scene.add(causticLight);
+
+// Environment Map for realistic reflections
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+pmremGenerator.compileEquirectangularShader();
+
+const envCanvas = document.createElement('canvas');
+envCanvas.width = 512; envCanvas.height = 512;
+const ctx = envCanvas.getContext('2d');
+const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+gradient.addColorStop(0, '#d4eaf8');
+gradient.addColorStop(0.25, '#93c5fd');
+gradient.addColorStop(0.6, '#3b82f6');
+gradient.addColorStop(1, '#1e3a8a');
+ctx.fillStyle = gradient;
+ctx.fillRect(0, 0, 512, 512);
+// Add a subtle sun disc
+const sunGrad = ctx.createRadialGradient(330, 80, 0, 330, 80, 60);
+sunGrad.addColorStop(0, 'rgba(255,245,200,0.9)');
+sunGrad.addColorStop(1, 'rgba(255,245,200,0)');
+ctx.fillStyle = sunGrad;
+ctx.fillRect(270, 20, 120, 120);
+const envTex = new THREE.CanvasTexture(envCanvas);
+scene.environment = pmremGenerator.fromEquirectangular(envTex).texture;
+
+// ── CAUSTIC OVERLAY TEXTURE ──
+const causticCanvas = document.createElement('canvas');
+causticCanvas.width = 256; causticCanvas.height = 256;
+const cctx = causticCanvas.getContext('2d');
+(function buildCaustic() {
+  cctx.clearRect(0, 0, 256, 256);
+  for (let i = 0; i < 160; i++) {
+    const x = Math.random() * 256, y = Math.random() * 256;
+    const r = 5 + Math.random() * 16;
+    const g = cctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(180,230,255,0.28)');
+    g.addColorStop(0.5, 'rgba(100,190,255,0.1)');
+    g.addColorStop(1, 'rgba(0,120,200,0)');
+    cctx.fillStyle = g;
+    cctx.beginPath(); cctx.arc(x, y, r, 0, Math.PI * 2); cctx.fill();
+  }
+})();
+const causticTex = new THREE.CanvasTexture(causticCanvas);
+causticTex.wrapS = causticTex.wrapT = THREE.RepeatWrapping;
+causticTex.repeat.set(3, 3);
+
+// Remove blue grid — solid floor doesn't need it
+const bottomGeo = new THREE.PlaneGeometry(150, 150);
+const bottomMat = new THREE.MeshStandardMaterial({
+  color: 0x042d3f,
+  roughness: 0.9,
+  metalness: 0.0,
+  envMapIntensity: 0.1
+});
+const bottom = new THREE.Mesh(bottomGeo, bottomMat);
+bottom.rotation.x = -Math.PI / 2;
+bottom.position.y = -15.1;
+bottom.receiveShadow = true;
+scene.add(bottom);
+
+// Caustic shimmer plane sits just above sand
+const causticPlaneGeo = new THREE.PlaneGeometry(150, 150);
+const causticPlaneMat = new THREE.MeshBasicMaterial({
+  map: causticTex,
+  transparent: true,
+  opacity: 0.55,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
+const causticPlane = new THREE.Mesh(causticPlaneGeo, causticPlaneMat);
+causticPlane.rotation.x = -Math.PI / 2;
+causticPlane.position.y = -15.0;
+scene.add(causticPlane);
+
+// Animate caustic texture offset
+let causticOffset = 0;
+
+// CPU Wave Equation Parameters
+const gridRes = 128; 
+const planeSize = 80;
+let damping = 0.96;
+let rippleRadius = 4;
+let interactionForce = 1.5;
+let waveAmplitude = 1.0;
+let foamThreshold = 2.5;
+
+let heightMap1 = new Float32Array(gridRes * gridRes);
+let heightMap2 = new Float32Array(gridRes * gridRes);
+
+// Water Mesh - Upgraded to Physical Material
+const geometry = new THREE.PlaneGeometry(planeSize, planeSize, gridRes - 1, gridRes - 1);
+geometry.rotateX(-Math.PI / 2);
+
+const material = new THREE.MeshPhysicalMaterial({
+  color: 0x0ea5e9,
+  metalness: 0.05,
+  roughness: 0.08,
+  transmission: 0.0,
+  ior: 1.33,
+  envMapIntensity: 1.8,
+  transparent: true,
+  opacity: 0.92,
+  thickness: 4.0,
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.05,
+  reflectivity: 1.0,
+  side: THREE.FrontSide,
+  depthWrite: true
+});
+
+const water = new THREE.Mesh(geometry, material);
+scene.add(water);
+
+// Raycaster for mouse interaction
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let isDragging = false;
+let lastU = -1, lastV = -1;
+
+function applyRipple(u, v) {
+  const cx = Math.floor(u * gridRes);
+  const cy = Math.floor(v * gridRes);
+  
+  for (let i = -rippleRadius; i <= rippleRadius; i++) {
+    for (let j = -rippleRadius; j <= rippleRadius; j++) {
+      const x = cx + i;
+      const y = cy + j;
+      if (x >= 0 && x < gridRes && y >= 0 && y < gridRes) {
+        const dist = Math.sqrt(i*i + j*j);
+        if (dist <= rippleRadius) {
+          const force = Math.cos((dist / rippleRadius) * Math.PI / 2) * interactionForce;
+          heightMap1[y * gridRes + x] -= force; 
+        }
+      }
+    }
+  }
+}
+
+// Event Listeners
+function handleInteraction(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObject(water);
+  
+  if (intersects.length > 0) {
+    const hit = intersects[0];
+    water.updateWorldMatrix(true, false);
+    const normal = hit.face.normal.clone().transformDirection(water.matrixWorld);
+    // Only respond to front-face hits (normal points opposite to ray direction)
+    if (normal.dot(raycaster.ray.direction) >= 0) {
+      lastU = -1; lastV = -1;
+      return;
+    }
+    const uv = hit.uv;
+    // Flip V so near-screen maps to near-camera water (UV origin is bottom-left, plane origin is top-left from camera)
+    const ux = uv.x;
+    const uy = 1.0 - uv.y;
+    if (isDragging && lastU !== -1) {
+      const steps = 3;
+      for(let s=1; s<=steps; s++) {
+        applyRipple(lastU + (ux - lastU) * (s/steps), lastV + (uy - lastV) * (s/steps));
+      }
+    } else {
+      applyRipple(ux, uy);
+    }
+    lastU = ux;
+    lastV = uy;
+  }
+}
+
+canvas.addEventListener('mousedown', (e) => { isDragging = true; handleInteraction(e.clientX, e.clientY); });
+canvas.addEventListener('mousemove', (e) => { if(isDragging) handleInteraction(e.clientX, e.clientY); });
+window.addEventListener('mouseup', () => { isDragging = false; lastU = -1; });
+canvas.addEventListener('mouseleave', () => { isDragging = false; lastU = -1; });
+
+canvas.addEventListener('touchstart', (e) => { 
+  isDragging = true; handleInteraction(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); 
+}, {passive: false});
+canvas.addEventListener('touchmove', (e) => { 
+  if(isDragging) handleInteraction(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault();
+}, {passive: false});
+window.addEventListener('touchend', () => { isDragging = false; lastU = -1; });
+
+// Resize Handler
+function resize() {
+  const container = document.getElementById('viewport');
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ── BIND SETTINGS CONTROLS ──
+const updateVal = (id, val, textVal) => {
+  document.getElementById(id).value = val;
+  document.getElementById('val-' + id.split('-')[1]).textContent = textVal !== undefined ? textVal : val;
+  document.getElementById(id).dispatchEvent(new Event('input', { bubbles: true }));
+};
+
+document.getElementById('slider-damp').addEventListener('input', e => { damping = parseFloat(e.target.value); document.getElementById('val-damp').textContent = damping.toFixed(2); });
+document.getElementById('slider-radius').addEventListener('input', e => { rippleRadius = parseInt(e.target.value); document.getElementById('val-radius').textContent = rippleRadius; });
+document.getElementById('slider-force').addEventListener('input', e => { interactionForce = parseFloat(e.target.value); document.getElementById('val-force').textContent = interactionForce.toFixed(1); });
+
+document.getElementById('slider-trans').addEventListener('input', e => { material.transmission = parseFloat(e.target.value); document.getElementById('val-trans').textContent = e.target.value; });
+document.getElementById('slider-ior').addEventListener('input', e => { material.ior = parseFloat(e.target.value); document.getElementById('val-ior').textContent = e.target.value; });
+document.getElementById('slider-metal').addEventListener('input', e => { material.metalness = parseFloat(e.target.value); document.getElementById('val-metal').textContent = e.target.value; });
+document.getElementById('slider-rough').addEventListener('input', e => { material.roughness = parseFloat(e.target.value); document.getElementById('val-rough').textContent = e.target.value; });
+document.getElementById('color-water').addEventListener('input', e => { material.color.set(e.target.value); });
+
+// AAA: Sun controls
+document.getElementById('slider-sun-az').addEventListener('input', e => { sunAzimuth = parseFloat(e.target.value); document.getElementById('val-sun-az').textContent = Math.round(sunAzimuth) + '°'; updateSunPosition(); });
+document.getElementById('slider-sun-el').addEventListener('input', e => { sunElevation = parseFloat(e.target.value); document.getElementById('val-sun-el').textContent = Math.round(sunElevation) + '°'; updateSunPosition(); });
+document.getElementById('slider-sun-int').addEventListener('input', e => { sunLight.intensity = parseFloat(e.target.value); document.getElementById('val-sun-int').textContent = parseFloat(e.target.value).toFixed(1); });
+
+// AAA: Reflection / refraction
+document.getElementById('slider-envmap').addEventListener('input', e => { material.envMapIntensity = parseFloat(e.target.value); document.getElementById('val-envmap').textContent = parseFloat(e.target.value).toFixed(1); });
+document.getElementById('slider-clearcoat').addEventListener('input', e => { material.clearcoat = parseFloat(e.target.value); document.getElementById('val-clearcoat').textContent = parseFloat(e.target.value).toFixed(2); });
+document.getElementById('slider-thickness').addEventListener('input', e => { material.thickness = parseFloat(e.target.value); document.getElementById('val-thickness').textContent = parseFloat(e.target.value).toFixed(1); });
+
+// AAA: Wave
+document.getElementById('slider-amplitude').addEventListener('input', e => { waveAmplitude = parseFloat(e.target.value); document.getElementById('val-amplitude').textContent = parseFloat(e.target.value).toFixed(1); });
+document.getElementById('slider-exposure').addEventListener('input', e => { renderer.toneMappingExposure = parseFloat(e.target.value); document.getElementById('val-exposure').textContent = parseFloat(e.target.value).toFixed(1); });
+
+function setRealistic() {
+  updateVal('slider-damp', 0.98, '0.98');
+  updateVal('slider-radius', 3, '3');
+  updateVal('slider-force', 1.0, '1.0');
+  
+  document.getElementById('color-water').value = "#d4eaf7";
+  document.getElementById('color-water').dispatchEvent(new Event('input'));
+  
+  updateVal('slider-trans', 0.92, '0.92');
+  updateVal('slider-ior', 1.33, '1.33');
+  updateVal('slider-metal', 0.05, '0.05');
+  updateVal('slider-rough', 0.06, '0.06');
+
+  // AAA settings
+  updateVal('slider-sun-az', 45, '45°');
+  updateVal('slider-sun-el', 35, '35°');
+  updateVal('slider-sun-int', 3.5, '3.5');
+  updateVal('slider-envmap', 2.2, '2.2');
+  updateVal('slider-clearcoat', 1.0, '1.00');
+  updateVal('slider-thickness', 5.0, '5.0');
+  updateVal('slider-amplitude', 1.2, '1.2');
+  updateVal('slider-exposure', 1.3, '1.3');
+}
+
+// ── SIMULATION & FPS LOOP ──
+let fpsFrames = 0;
+let fpsLastTime = performance.now();
+const fpsDisplay = document.getElementById('fps-val');
+
+function updateFPS() {
+  fpsFrames++;
+  const now = performance.now();
+  if (now - fpsLastTime >= 1000) {
+    fpsDisplay.textContent = Math.round((fpsFrames * 1000) / (now - fpsLastTime)) + ' FPS';
+    fpsFrames = 0;
+    fpsLastTime = now;
+  }
+}
+
+function simulateWater() {
+  const positions = water.geometry.attributes.position.array;
+  
+  for (let x = 1; x < gridRes - 1; x++) {
+    for (let y = 1; y < gridRes - 1; y++) {
+      const i = y * gridRes + x;
+      heightMap2[i] = (
+        heightMap1[i - 1] + 
+        heightMap1[i + 1] + 
+        heightMap1[i - gridRes] + 
+        heightMap1[i + gridRes]
+      ) / 2 - heightMap2[i];
+      heightMap2[i] *= damping;
+    }
+  }
+
+  for (let i = 0; i < heightMap1.length; i++) {
+    if (Math.random() < 0.001) heightMap2[i] += (Math.random() - 0.5) * 0.2; 
+    let temp = heightMap1[i];
+    heightMap1[i] = heightMap2[i];
+    heightMap2[i] = temp;
+    positions[i * 3 + 1] = heightMap1[i] * waveAmplitude; 
+  }
+
+  water.geometry.attributes.position.needsUpdate = true;
+  water.geometry.computeVertexNormals();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  simulateWater();
+  // Animate caustic pattern drift
+  causticOffset += 0.0003;
+  causticTex.offset.set(Math.sin(causticOffset * 0.7) * 0.08, causticOffset % 1);
+  // Caustic light flicker based on surface energy
+  const energy = heightMap1.reduce((a,v) => a + Math.abs(v), 0) / heightMap1.length;
+  causticLight.intensity = 1.5 + energy * 0.8;
+  updateFPS();
+  renderer.render(scene, camera);
+}
+
+// Initial ripple
+applyRipple(0.5, 0.5);
+animate();
+</script>
+</body>
+</html>
